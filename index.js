@@ -31,12 +31,43 @@ class Player {
 class Room {
   constructor() {
     this.players = {
-      player1: { username: '', hand: [], score: 0, team: '1' },
-      player2: { username: '', hand: [], score: 0, team: '2' },
-      player3: { username: '', hand: [], score: 0, team: '1' },
-      player4: { username: '', hand: [], score: 0, team: '2' }
+      player1: {
+        username: '',
+        hand: [],
+        score: 0,
+        team: '1',
+        socketId: null,
+        bid: 0
+      },
+      player2: {
+        username: '',
+        hand: [],
+        score: 0,
+        team: '2',
+        socketId: null,
+        bid: 0
+      },
+      player3: {
+        username: '',
+        hand: [],
+        score: 0,
+        team: '1',
+        socketId: null,
+        bid: 0
+      },
+      player4: {
+        username: '',
+        hand: [],
+        score: 0,
+        team: '2',
+        socketId: null,
+        bid: 0
+      }
     };
     this.deck = [];
+    this.bid = 0;
+    this.trumpSuit = null;
+    this.currentSuit = null;
   }
   generateDeck = () => {
     const suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
@@ -99,7 +130,7 @@ class Card {
 const rooms = {};
 
 io.on('connection', socket => {
-  console.log('New connection');
+  console.log('New connection: ' + socket.id);
 
   socket.on('disconnect', () => {
     console.log('User left');
@@ -118,11 +149,13 @@ io.on('connection', socket => {
   socket.on('join_room', roomName => {
     socket.join(roomName);
     io.emit('return_room', rooms[roomName]);
+    io.emit('return_socketid', socket.id);
   });
   socket.on('choose_seat', ({ player, playerNumber, username, roomName }) => {
     // Put player in their seat
 
     rooms[roomName].players[`player${playerNumber}`].username = username;
+    rooms[roomName].players[`player${playerNumber}`].socketId = socket.id;
     const playerNames = {
       player1: rooms[roomName].players.player1.username,
       player2: rooms[roomName].players.player2.username,
@@ -133,9 +166,21 @@ io.on('connection', socket => {
       room: rooms[roomName].players,
       tempPlayerNames: playerNames
     };
-    console.log('return_seats', data);
-    console.log(roomName);
     io.in(roomName).emit('return_seats', data);
+    // if all seats are filled, start game
+    if (
+      playerNames.player1 &&
+      playerNames.player2 &&
+      playerNames.player3 &&
+      playerNames.player4
+    ) {
+      // Start Game
+      console.log(roomName);
+      console.log(rooms);
+      rooms[roomName].startGame();
+      io.in(roomName).emit('return_room', rooms[roomName]);
+      // Bidding
+    }
   });
   socket.on('start_game', roomName => {
     console.log(roomName);
@@ -151,7 +196,7 @@ io.on('connection', socket => {
       hand: [],
       score: 0,
       team: 2 - (playerNumber % 2)
-    }; /* Team 1 if playerNumber is 1 || 3. Team 2 if playerNumber is 2 || 4. */
+    }; /* Team 1 if playerNumber is 1 or 3. Team 2 if playerNumber is 2 or 4. */
     io.in(roomName).emit('return_room', rooms[roomName]);
   });
 });
