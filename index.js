@@ -29,7 +29,7 @@ class Player {
   }
 }
 class Room {
-  constructor() {
+  constructor(name) {
     this.players = {
       player1: {
         username: '',
@@ -66,8 +66,11 @@ class Room {
     };
     this.deck = [];
     this.bid = 0;
+    this.currentBidder = 0;
     this.trumpSuit = null;
     this.currentSuit = null;
+    this.bidders = [1, 2, 3, 4];
+    this.name = name;
   }
   generateDeck = () => {
     const suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
@@ -111,6 +114,33 @@ class Room {
     }
     console.log('Dealt cards');
   };
+  selectBid = (playerNumber, bid) => {
+    this.players[`player${playerNumber}`].bid = bid;
+    if (bid !== 'pass') {
+      this.bid = bid;
+      this.winningBidder = playerNumber;
+    } else {
+      this.bidders.pop(playerNumber);
+    }
+    if (this.bidders.length > 1) {
+      this.chooseNextBidder();
+    } else {
+      console.log('Ask player ' + this.winningBidder + ' for trump suit.');
+    }
+  };
+  chooseNextBidder = () => {
+    if (this.currentBidder < 4) {
+      this.currentBidder++;
+    } else {
+      this.currentBidder = 1;
+    }
+    // if player bid == pass, remove from bidders array and run again
+    if (this.players[`player${this.currentBidder}`].bid === 'pass') {
+      this.chooseNextBidder();
+    } else {
+      io.in(this.name).emit('return_bid', this);
+    }
+  };
   startGame = () => {
     this.generateDeck();
     this.shuffleDeck();
@@ -143,7 +173,7 @@ io.on('connection', socket => {
     io.emit('return_rooms', rooms);
   });
   socket.on('create_room', roomName => {
-    rooms[roomName] = new Room();
+    rooms[roomName] = new Room(roomName);
     io.emit('return_rooms', rooms);
   });
   socket.on('join_room', roomName => {
@@ -175,12 +205,18 @@ io.on('connection', socket => {
       playerNames.player4
     ) {
       // Start Game
-      console.log(roomName);
+      console.log(rooms[roomName].players.player1);
       console.log(rooms);
-      rooms[roomName].startGame();
-      io.in(roomName).emit('return_room', rooms[roomName]);
+      // rooms[roomName].startGame();
       // Bidding
+      rooms[roomName].currentBidder = Math.floor(Math.random() * 4) + 1; // Choose random bidder from 1 to 4
+      console.log('bid', rooms[roomName]);
+
+      io.in(roomName).emit('return_room', rooms[roomName]);
     }
+  });
+  socket.on('select_bid', ({ roomName, playerNumber, bid }) => {
+    rooms[roomName].selectBid(playerNumber, bid);
   });
   socket.on('start_game', roomName => {
     console.log(roomName);

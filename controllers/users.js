@@ -34,7 +34,7 @@ router.post('/login', async (req, res) => {
       res.send('Not allowed');
     }
   } catch {
-    res.status(500).send();
+    res.status(500).send('Forbidden');
   }
 });
 
