@@ -108,24 +108,46 @@ class Room {
         tempCard.player = `player${i}`;
         this.players[`player${i}`].hand.push(tempCard);
       }
-      this.players[`player${i}`].hand = this.players[`player${i}`].hand.sort(
-        (a, b) => a.suit - b.suit
-      );
+      // sorted by 1. suit, 2. value
+      this.players[`player${i}`].hand = this.players[`player${i}`].hand
+        .sort((a, b) => a.value - b.value)
+        .sort((a, b) => {
+          // sorting suits so it's black, red, black, red.
+          const order = {
+            Hearts: 1,
+            Clubs: 2,
+            Diamonds: 3,
+            Spades: 4
+          };
+          return order[a.suit] - order[b.suit];
+        });
     }
     console.log('Dealt cards');
   };
+  startBid = () => {
+    this.generateDeck();
+    this.shuffleDeck();
+    this.dealCards();
+    this.currentBidder = Math.floor(Math.random() * 4) + 1; // Choose random bidder from 1 to 4
+    io.in(this.name).emit('return_room', this);
+  };
   selectBid = (playerNumber, bid) => {
     this.players[`player${playerNumber}`].bid = bid;
+    console.log(`Player ${playerNumber} has bid ${bid}`);
     if (bid !== 'pass') {
       this.bid = bid;
       this.winningBidder = playerNumber;
     } else {
+      // remove player from bidders
       this.bidders.pop(playerNumber);
     }
-    if (this.bidders.length > 1) {
+    // bid ends when 3 people passed or bid is 13
+    if (this.bidders.length > 1 && this.bid !== 13) {
       this.chooseNextBidder();
     } else {
+      this.currentBidder = 0;
       console.log('Ask player ' + this.winningBidder + ' for trump suit.');
+      // enter code when player wins a bid
     }
   };
   chooseNextBidder = () => {
@@ -141,11 +163,7 @@ class Room {
       io.in(this.name).emit('return_bid', this);
     }
   };
-  startGame = () => {
-    this.generateDeck();
-    this.shuffleDeck();
-    this.dealCards();
-  };
+  startGame = () => {};
 }
 
 class Card {
@@ -183,7 +201,6 @@ io.on('connection', socket => {
   });
   socket.on('choose_seat', ({ player, playerNumber, username, roomName }) => {
     // Put player in their seat
-
     rooms[roomName].players[`player${playerNumber}`].username = username;
     rooms[roomName].players[`player${playerNumber}`].socketId = socket.id;
     const playerNames = {
@@ -204,17 +221,10 @@ io.on('connection', socket => {
       playerNames.player3 &&
       playerNames.player4
     ) {
-      // Start Game
-      console.log(rooms[roomName].players.player1);
-      console.log(rooms);
-      // rooms[roomName].startGame();
-      // Bidding
-      rooms[roomName].currentBidder = Math.floor(Math.random() * 4) + 1; // Choose random bidder from 1 to 4
-      console.log('bid', rooms[roomName]);
-
-      io.in(roomName).emit('return_room', rooms[roomName]);
+      rooms[roomName].startBid();
     }
   });
+  // when player chooses a bid amount
   socket.on('select_bid', ({ roomName, playerNumber, bid }) => {
     rooms[roomName].selectBid(playerNumber, bid);
   });
