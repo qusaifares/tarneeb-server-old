@@ -186,6 +186,19 @@ class Room {
       io.in(this.name).emit('return_bid', this);
     }
   };
+  selectTrump = trump => {
+    // set trump suit
+    this.trumpSuit = trump;
+    for (let p = 1; p <= 4; p++) {
+      this.players[`player${p}`].hand.forEach(card => {
+        if (card.suit === this.trumpSuit) {
+          card.power = card.value + 13 * 4; // set power in trump suit cards to be higher than all other cards
+          console.log(p, card.name, card.power);
+        }
+      });
+    }
+    io.in(this.name).emit('return_room', this);
+  };
   startGame = () => {};
 }
 
@@ -247,6 +260,11 @@ io.on('connection', socket => {
       rooms[roomName].startBid();
     }
   });
+  socket.on('select_trump', ({ roomName, playerNumber, trump }) => {
+    console.log('trump selected');
+    rooms[roomName].selectTrump(trump);
+  });
+
   // when player chooses a bid amount
   socket.on('select_bid', ({ roomName, playerNumber, bid }) => {
     rooms[roomName].selectBid(playerNumber, bid);
